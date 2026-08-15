@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.database.connection import engine
 
 app = FastAPI(
     title="CITADEL API",
@@ -14,3 +15,20 @@ def root():
         "status": "online",
         "message": "CITADEL backend is running"
     }
+
+
+@app.get("/health")
+def health_check():
+    try:
+        with engine.connect():
+            return {
+                "system": "CITADEL",
+                "api": "online",
+                "database": "connected"
+            }
+    except Exception:
+        return {
+            "system": "CITADEL",
+            "api": "online",
+            "database": "disconnected"
+        }
