@@ -1,11 +1,16 @@
 from fastapi import FastAPI
+
 from app.database.connection import engine
+from app.routes.users import router as users_router
 
 app = FastAPI(
     title="CITADEL API",
     description="Classified Information and Tiered Access Defense Environment",
     version="1.0.0"
 )
+
+
+app.include_router(users_router)
 
 
 @app.get("/")
