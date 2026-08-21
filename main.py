@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.routes.records import router as records_router
 
 from app.database.connection import engine
 from app.routes.users import router as users_router
@@ -11,7 +12,7 @@ app = FastAPI(
 
 
 app.include_router(users_router)
-
+app.include_router(records_router)
 
 @app.get("/")
 def root():
