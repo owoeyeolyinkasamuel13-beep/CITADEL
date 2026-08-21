@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+
 from app.database.connection import get_db
 from app.models.models import ClassifiedRecord
 from app.security.authorization import can_access_record
-
+from app.security.permissions import has_permission
 
 router = APIRouter(
     prefix="/records",
@@ -55,6 +56,18 @@ def test_record_access(
             "record_code": record_code,
             "access": "DENIED",
             "reason": "Record not found"
+        }
+
+    if not has_permission(
+        db,
+        user_id,
+        "VIEW_RECORDS"
+    ):
+        return {
+            "record_code": record_code,
+            "user_id": user_id,
+            "access": "DENIED",
+            "reason": "Missing VIEW_RECORDS permission"
         }
 
     access_granted = can_access_record(

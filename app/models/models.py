@@ -1,8 +1,24 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, Table
+from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
 
+role_permissions = Table(
+    "role_permissions",
+    Base.metadata,
+    Column(
+        "role_id",
+        Integer,
+        ForeignKey("roles.role_id"),
+        primary_key=True
+    ),
+    Column(
+        "permission_id",
+        Integer,
+        ForeignKey("permissions.permission_id"),
+        primary_key=True
+    )
+)
 
 class User(Base):
     __tablename__ = "users"
@@ -31,6 +47,25 @@ class ClearanceLevel(Base):
     clearance_id = Column(Integer, primary_key=True)
     level_number = Column(Integer, nullable=False)
     classification_name = Column(String(100), nullable=False)
+
+class Permission(Base):
+    __tablename__ = "permissions"
+
+    permission_id = Column(Integer, primary_key=True)
+    permission_name = Column(String(100), unique=True, nullable=False)
+    description = Column(Text)
+
+class Role(Base):
+    __tablename__ = "roles"
+
+    role_id = Column(Integer, primary_key=True)
+    role_name = Column(String(100), unique=True, nullable=False)
+
+    permissions = relationship(
+        "Permission",
+        secondary=role_permissions,
+        backref="roles"
+    )
 
 class ClassifiedRecord(Base):
     __tablename__ = "classified_records"
