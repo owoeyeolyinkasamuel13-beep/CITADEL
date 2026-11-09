@@ -1,7 +1,16 @@
+import bcrypt
 from sqlalchemy.orm import Session
 
 from app.models.models import User
 from app.security.passwords import verify_password
+
+
+# A process-local dummy hash keeps missing, inactive, and passwordless accounts
+# on the same bcrypt verification path as an active account.
+_DUMMY_PASSWORD_HASH = bcrypt.hashpw(
+    b"not-a-real-user-password",
+    bcrypt.gensalt(),
+).decode("ascii")
 
 
 def authenticate_user(
@@ -14,16 +23,16 @@ def authenticate_user(
         User.personnel_id == personnel_id
     ).first()
 
-    if not user:
+    if user is None:
+        verify_password(password, _DUMMY_PASSWORD_HASH)
         return None
 
-    if user.account_status != "ACTIVE":
+    if user.account_status != "ACTIVE" or not user.password_hash:
+        verify_password(password, _DUMMY_PASSWORD_HASH)
         return None
 
-    if not user.password_hash:
-        return None
-
-    if not verify_password(password, user.password_hash):
+    password_matches = verify_password(password, user.password_hash)
+    if not password_matches:
         return None
 
     return user

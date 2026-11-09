@@ -1,4 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from app.routes.auth import router as auth_router
 from app.routes.records import router as records_router
 
 from app.database.connection import engine
@@ -11,8 +14,30 @@ app = FastAPI(
 )
 
 
+@app.exception_handler(RequestValidationError)
+async def redact_validation_errors(
+    request: Request,
+    exc: RequestValidationError,
+) -> JSONResponse:
+    """Return validation locations and types without echoing submitted data."""
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": [
+                {
+                    "loc": error.get("loc", ()),
+                    "msg": "Invalid value",
+                    "type": error.get("type", "validation_error"),
+                }
+                for error in exc.errors()
+            ]
+        },
+    )
+
+
 app.include_router(users_router)
 app.include_router(records_router)
+app.include_router(auth_router)
 
 @app.get("/")
 def root():

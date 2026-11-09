@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 
 from app.database.connection import get_db
-from app.models.models import ClassifiedRecord
+from app.models.models import ClassifiedRecord, User
 from app.security.authorization import can_access_record
 from app.security.permissions import has_permission
+from app.security.tokens import get_current_user
 
 router = APIRouter(
     prefix="/records",
@@ -14,7 +16,16 @@ router = APIRouter(
 
 
 @router.get("/")
-def get_records(db: Session = Depends(get_db)):
+def get_records(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not has_permission(db, current_user.user_id, "VIEW_RECORDS"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
+
     records = (
         db.query(ClassifiedRecord)
         .filter(ClassifiedRecord.classification_status == "APPROVED")
@@ -36,15 +47,29 @@ def get_records(db: Session = Depends(get_db)):
             "status": record.status
         }
         for record in records
+        if can_access_record(db, current_user.user_id, record)
     ]
 
 
-@router.get("/{record_code}/access/{user_id}")
+@router.get("/{record_code}/access")
 def test_record_access(
     record_code: str,
-    user_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if not has_permission(
+        db,
+        current_user.user_id,
+        "VIEW_RECORDS"
+    ):
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={
+                "access": "DENIED",
+                "reason": "Insufficient authorization",
+            },
+        )
+
     record = (
         db.query(ClassifiedRecord)
         .filter(ClassifiedRecord.record_code == record_code)
@@ -52,41 +77,26 @@ def test_record_access(
     )
 
     if not record:
-        return {
-            "record_code": record_code,
-            "access": "DENIED",
-            "reason": "Record not found"
-        }
-
-    if not has_permission(
-        db,
-        user_id,
-        "VIEW_RECORDS"
-    ):
-        return {
-            "record_code": record_code,
-            "user_id": user_id,
-            "access": "DENIED",
-            "reason": "Missing VIEW_RECORDS permission"
-        }
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"access": "DENIED", "reason": "Record not found"},
+        )
 
     access_granted = can_access_record(
         db,
-        user_id,
+        current_user.user_id,
         record
     )
 
     if not access_granted:
-        return {
-            "record_code": record_code,
-            "user_id": user_id,
-            "access": "DENIED",
-            "reason": "Insufficient authorization"
-        }
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"access": "DENIED", "reason": "Record not found"},
+        )
 
     return {
         "record_code": record.record_code,
-        "user_id": user_id,
+        "user_id": current_user.user_id,
         "access": "GRANTED",
         "title": record.title,
         "description": record.description,

@@ -19,7 +19,8 @@ DATABASE_URL = (
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True
+    pool_pre_ping=True,
+    connect_args={"charset": "utf8mb4"},
 )
 
 SessionLocal = sessionmaker(

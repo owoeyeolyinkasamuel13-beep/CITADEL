@@ -1,9 +1,9 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from app.models.models import User
-from app.security.authentication import authenticate_user
+from app.security.authentication import _DUMMY_PASSWORD_HASH, authenticate_user
 from app.security.passwords import hash_password, verify_password
 
 
@@ -62,7 +62,22 @@ class AuthenticateUserTests(unittest.TestCase):
     def test_missing_user_returns_none(self):
         self.set_user_result(None)
 
-        self.assertIsNone(authenticate_user(self.db, "CTD-00000000", "password"))
+        with patch("app.security.authentication.verify_password", return_value=False) as verify:
+            self.assertIsNone(authenticate_user(self.db, "CTD-00000000", "password"))
+        verify.assert_called_once()
+
+    def test_passwordless_user_runs_dummy_bcrypt_verification(self):
+        self.set_user_result(SimpleNamespace(
+            personnel_id="CTD-12345678",
+            account_status="ACTIVE",
+            password_hash=None,
+        ))
+
+        with patch("app.security.authentication.verify_password", return_value=False) as verify:
+            self.assertIsNone(
+                authenticate_user(self.db, "CTD-12345678", "incorrect password")
+            )
+        verify.assert_called_once()
 
     def test_inactive_account_returns_none(self):
         user = SimpleNamespace(
@@ -72,9 +87,11 @@ class AuthenticateUserTests(unittest.TestCase):
         )
         self.set_user_result(user)
 
-        self.assertIsNone(
-            authenticate_user(self.db, user.personnel_id, "correct password")
-        )
+        with patch("app.security.authentication.verify_password", return_value=True) as verify:
+            self.assertIsNone(
+                authenticate_user(self.db, user.personnel_id, "correct password")
+            )
+        verify.assert_called_once_with("correct password", _DUMMY_PASSWORD_HASH)
 
     def test_missing_password_hash_returns_none(self):
         user = SimpleNamespace(

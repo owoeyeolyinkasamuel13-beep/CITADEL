@@ -2,3 +2,5 @@ venv/
 __pycache__/
 *.pyc
 .env
+.login_rate_limit.sqlite3
+.login_rate_limit.sqlite3-journal
